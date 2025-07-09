@@ -40,6 +40,29 @@ def server_logic(host='0.0.0.0', port=8888):
         # Run at 10Hz
         time.sleep(0.1)
 
+def client_logic(host='192.168.43.1', port=8888): # NOTE: Use the actual IP of the host vehicle
+  pm = messaging.PubMaster(['carState'])
+
+  while True:
+    try:
+      with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        print(f"Attempting to connect to {host}:{port}...")
+        s.connect((host, port))
+        print("Connected to host.")
+        while True:
+          # 1. Listen for incoming data
+          data = s.recv(4096) # Adjust buffer size as needed
+          if not data:
+            break
+
+          # 2. Parse back into V2VData and publish locally
+          v2v_dat = messaging.new_message('v2vData').from_bytes(data)
+          pm.send('v2vData', v2v_dat)
+
+    except (ConnectionRefusedError, TimeoutError, OSError) as e:
+      print(f"Connection failed: {e}. Retrying in 5 seconds...")
+      time.sleep(5)
+
 def main():
     params = Params()
     role = params.get("V2VRole", encoding='utf-8') # V2VRole should be 'host' or 'client'
@@ -48,8 +71,8 @@ def main():
         server_logic()
         # print("Starting in HOST mode.")
     elif role == "client":
-      # client_logic()
-        print("Starting in CLIENT mode.")
+      client_logic()
+        # print("Starting in CLIENT mode.")
     else:
         print(f"Invalid V2VRole: '{role}'. Exiting.")
         return
